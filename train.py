@@ -15,6 +15,7 @@ from sklearn.metrics import average_precision_score, roc_auc_score, roc_curve, p
 from modeling.layers import build_criterion
 from torch.utils.data import DataLoader
 
+
 # ========== 额外新增的工具函数 ==========
 
 def get_all_classes(dataset_root):
@@ -22,6 +23,7 @@ def get_all_classes(dataset_root):
     获取 dataset_root 下所有子目录名作为子类名
     """
     return [d for d in os.listdir(dataset_root) if os.path.isdir(os.path.join(dataset_root, d))]
+
 
 def aucPerformance(scores, labels, prt=True):
     """
@@ -32,6 +34,7 @@ def aucPerformance(scores, labels, prt=True):
     if prt:
         print("AUC-ROC: %.4f, AUC-PR: %.4f" % (roc_auc, ap))
     return roc_auc, ap
+
 
 def plot_roc_pr_curves(labels, scores, save_dir, prefix=''):
     """
@@ -66,6 +69,7 @@ def plot_roc_pr_curves(labels, scores, save_dir, prefix=''):
     plt.legend(loc="lower left")
     plt.savefig(os.path.join(save_dir, f'{prefix}PR_curve.png'), dpi=300)
     plt.close()
+
 
 # ========== 优化后的训练类 ==========
 
@@ -105,12 +109,15 @@ class Trainer(object):
             self.model = self.model.cuda()
             self.criterion = self.criterion.cuda()
 
-        # 创建日志文件（可在子类目录 + repetition 目录下）
+        # 创建日志文件
         self.log_file = os.path.join(self.args.experiment_dir, 'training_log.txt')
         with open(self.log_file, 'w') as f:
             f.write("====== Training Log ======\n")
 
     def generate_target(self, target, eval=False):
+        """
+        根据实际情况给四个头部分配不同的target
+        """
         targets = list()
         if eval:
             # eval 时对应 4 个 head：0->正常，1/2/3->原始标签
@@ -121,7 +128,7 @@ class Trainer(object):
             return targets
         else:
             # train 时
-            # target==0 表示正常样本，!=0 表示异常(其中可能区分 1,2?)
+            # target==0 表示正常样本，!=0 表示异常(其中可能区分 1,2? 视任务定义)
             temp_t = target != 0
             targets.append(target == 0)
             targets.append(temp_t[target != 2])
@@ -185,7 +192,7 @@ class Trainer(object):
             f.write(f"Epoch {epoch}: Loss {train_loss / len(self.train_loader):.4f}, LR {current_lr:.6f}\n")
 
     def normalization(self, data):
-        # 如果需要可在这里对输出进行 0-1 等归一化；这里简单返回
+        # 如果需要可在这里对输出进行 0-1 等归一化，这里简单返回
         return data
 
     def eval(self):
@@ -286,18 +293,18 @@ def main():
     parser.add_argument("--test_threshold", type=int, default=0, help="the outlier contamination rate in the training data")
     parser.add_argument("--test_rate", type=float, default=0.0, help="the outlier contamination rate in the training data")
     parser.add_argument("--dataset", type=str, default='mvtecad', help="a list of data set names")
-    parser.add_argument("--ramdn_seed", type=int, default=42, help="the random seed number")
+    parser.add_argument("--ramdn_seed", type=int, default=42, help="the base random seed number")
     parser.add_argument('--workers', type=int, default=4, metavar='N', help='dataloader threads')
     parser.add_argument('--no-cuda', action='store_true', default=False, help='disables CUDA training')
     parser.add_argument('--savename', type=str, default='model.pkl', help="save modeling")
     parser.add_argument('--dataset_root', type=str, default='./data/mvtec_anomaly_detection', help="dataset root")
     parser.add_argument('--experiment_dir', type=str, default='./experiment/experiment_mlr', help="experiment directory")
-    parser.add_argument('--classname', type=str, default='all', help="dataset class")  # 若设为 'all' 则遍历所有子类
+    parser.add_argument('--classname', type=str, default='bottle', help="dataset class")  # 若设为 'all' 则遍历所有子类
     parser.add_argument('--img_size', type=int, default=448, help="image size")
     parser.add_argument("--nAnomaly", type=int, default=10, help="the number of anomaly data in training set")
     parser.add_argument("--n_scales", type=int, default=2, help="number of scales at which features are extracted")
     parser.add_argument('--backbone', type=str, default='resnet18', help="backbone")
-    parser.add_argument('--criterion', type=str, default='deviation', help="loss")
+    parser.add_argument('--criterion', type=str, default='deviation', help="loss: 'CE' or 'deviation' or other custom")
     parser.add_argument("--topk", type=float, default=0.1, help="topk in MIL")
     parser.add_argument('--know_class', type=str, default=None, help="set the know class for hard setting")
     parser.add_argument('--pretrain_dir', type=str, default=None, help="root of pretrain weight")
@@ -321,12 +328,8 @@ def main():
     if not os.path.exists(args.experiment_dir):
         os.makedirs(args.experiment_dir)
 
-    # 固定随机种子，确保可复现
-    random.seed(args.ramdn_seed)
-    np.random.seed(args.ramdn_seed)
-    torch.manual_seed(args.ramdn_seed)
-    if args.cuda:
-        torch.cuda.manual_seed_all(args.ramdn_seed)
+    # 保留最初的 experiment_dir 以便后续在循环中基于它来构建
+    base_experiment_dir = args.experiment_dir
 
     # 记录所有子类的 AUC-ROC
     all_subclass_aucs = {}
@@ -335,7 +338,7 @@ def main():
     for cls in sub_classes:
         print(f"\n================= Class: {cls} =================")
         # 为子类单独创建目录
-        subclass_exp_dir = os.path.join(args.experiment_dir, cls)
+        subclass_exp_dir = os.path.join(base_experiment_dir, cls)
         if not os.path.exists(subclass_exp_dir):
             os.makedirs(subclass_exp_dir)
 
@@ -345,11 +348,28 @@ def main():
 
         for rep in range(args.repeats):
             print(f"\n*** Start Training [Class={cls}, Repetition={rep+1}/{args.repeats}] ***")
-            # 修改 args 中的子类、实验目录
+            # 每次重复都基于子类目录再创建 rep 目录
+            rep_exp_dir = os.path.join(subclass_exp_dir, f"rep_{rep+1}")
+            if not os.path.exists(rep_exp_dir):
+                os.makedirs(rep_exp_dir)
+
+            # ========== 设置随机数种子（可复现） ==========
+            # 你可以自定义如何改变随机数种子，这里演示用 (基准seed + rep)
+            current_seed = (args.ramdn_seed ^ ((rep + 1) * 999983)) % 2147483647
+            random.seed(current_seed)
+            np.random.seed(current_seed)
+            torch.manual_seed(current_seed)
+            if args.cuda:
+                torch.cuda.manual_seed_all(current_seed)
+
+            # 记录本次实验的随机种子到文件
+            seed_log = os.path.join(rep_exp_dir, 'seed_log.txt')
+            with open(seed_log, 'w') as sf:
+                sf.write(f"Current random seed: {current_seed}\n")
+
+            # 更新 args 中的子类、实验目录
             args.classname = cls
-            args.experiment_dir = os.path.join(subclass_exp_dir, f"rep_{rep+1}")
-            if not os.path.exists(args.experiment_dir):
-                os.makedirs(args.experiment_dir)
+            args.experiment_dir = rep_exp_dir
 
             # 初始化 Trainer
             trainer = Trainer(args)
@@ -403,7 +423,7 @@ def main():
         print(f"\n[Overall] => AUC-ROC mean±std: {final_mean:.4f} ± {final_std:.4f}")
 
         # 记录到 overall_summary
-        with open(os.path.join(args.experiment_dir, 'overall_summary.txt'), 'w') as f:
+        with open(os.path.join(base_experiment_dir, 'overall_summary.txt'), 'w') as f:
             f.write(f"All Classes ROC: {flat_aucs}\n")
             f.write(f"Overall Mean±std AUC-ROC: {final_mean:.4f} ± {final_std:.4f}\n")
 
