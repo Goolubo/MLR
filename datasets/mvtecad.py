@@ -4,6 +4,9 @@ from datasets.base_dataset import BaseADDataset
 from PIL import Image
 from torchvision import transforms
 from datasets.cutmix import CutMix
+from datasets.cutpaste import CutPasteNormal
+from datasets.randomnoise import RandomNoise
+from datasets.colorjitter import PatchColorJitter
 import random
 
 class MVTecAD(BaseADDataset):
@@ -128,13 +131,62 @@ class MVTecAD(BaseADDataset):
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
         return composed_transforms
 
+    # def transform_pseudo(self):
+    #     """
+    #     添加了cutmix
+    #     """
+    #     composed_transforms = transforms.Compose([
+    #         transforms.Resize((self.args.img_size,self.args.img_size)),
+    #         CutMix(),
+    #         transforms.RandomRotation(180),
+    #         transforms.ToTensor(),
+    #         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+    #     return composed_transforms
+
     def transform_pseudo(self):
+        """
+        添加了CutPasteNormal、CutPasteNormal、CutMix、PatchColorJitter
+        """
         composed_transforms = transforms.Compose([
-            transforms.Resize((self.args.img_size,self.args.img_size)),
+            transforms.Resize((self.args.img_size, self.args.img_size)),
+
+            # # 50% 概率使用 CutPaste 并降低 ColorJitter 影响
+            # transforms.RandomApply([
+            #     CutPasteNormal(
+            #         area_ratio=(0.02, 0.15),
+            #         aspect_ratio=0.3,
+            #         transform=PatchColorJitter(
+            #             brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05
+            #         )
+            #     )
+            # ], p=0.5),
+            # # # 50% 概率添加小幅高斯噪声
+            # transforms.RandomApply([
+            #     RandomNoise(prob=1.0, mean=0.0, std=0.02)
+            # ], p=0.5),
+
+
+
+
+
+            # 修改略微极端，但是可以正常运行，且效果不错
+            CutPasteNormal(
+                area_ratio=(0.02, 0.15),
+                aspect_ratio=0.3,
+                transform=PatchColorJitter(
+                    brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+                )
+            ),
+            RandomNoise(prob=0.5, mean=0.0, std=0.05),
             CutMix(),
-            transforms.RandomRotation(180),
+
+
+
+
+
             transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])])
+            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        ])
         return composed_transforms
 
     def transform_test(self):

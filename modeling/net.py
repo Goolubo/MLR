@@ -2,6 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from modeling.networks.backbone import build_feature_extractor, NET_OUT_DIM
+from scipy.spatial.distance import cdist
+import torch.nn.functional as F
+import numpy as np
 
 
 class HolisticHead(nn.Module):
@@ -116,11 +119,12 @@ class CompositeHeadwr(PlainHead):
 
                                   )
 
+
     def forward(self, x, ref):
         #ckidx1=ref.size(0)//3-1
         #ckidx2=ref.size(0)*2//3-1
         #ckidx3=ref.size(0)-1
-        
+
         for i in range(ref.size(0)):
             ref0 = ref[i, :, :, :].repeat([x.size(0), 1, 1, 1])
             x0 = ref0 - x
@@ -131,8 +135,8 @@ class CompositeHeadwr(PlainHead):
             else:
                 xr=xr+x0
                 ckx0 += super().forward(xr/(i+1))
-            
-            
+
+
             '''
             if i==ckidx1:
                 xr1=xr/(1+i)
@@ -144,7 +148,7 @@ class CompositeHeadwr(PlainHead):
                 xr3=xr/(1+i)
                 ckx3 = super().forward(xr3)
             '''
-      
+
         xr=xr/ref.size(0)
 
         #combined_tensor = torch.cat((x0.unsqueeze(0), x1.unsqueeze(0), x2.unsqueeze(0), x3.unsqueeze(0),x4.unsqueeze(0)),0)
@@ -152,6 +156,7 @@ class CompositeHeadwr(PlainHead):
 
         x = ckx0/ref.size(0)
         return x,xr
+
 class DRA(nn.Module):
     def __init__(self, cfg, backbone="resnet18"):
         super(DRA, self).__init__()

@@ -1,6 +1,10 @@
 from datasets import mvtecad
 from torch.utils.data import DataLoader
 from dataloaders.utlis import worker_init_fn_seed, BalancedBatchSampler
+from sklearn.cluster import KMeans
+import torch
+from modeling.net import DRA
+import numpy as np
 
 class initDataloader():
 
@@ -21,3 +25,5 @@ class initDataloader():
             return train_loader, test_loader
         else:
             raise NotImplementedError
+
+

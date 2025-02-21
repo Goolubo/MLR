@@ -201,6 +201,8 @@ class Trainer(object):
         test_loss = 0.0
         class_pred = [np.array([]) for _ in range(self.args.total_heads)]
         total_target = np.array([])
+        # all_scores = []
+        # all_labels = []
 
         for i, sample in enumerate(tbar):
             image, target = sample['image'], sample['label']
@@ -299,7 +301,7 @@ def main():
     parser.add_argument('--savename', type=str, default='model.pkl', help="save modeling")
     parser.add_argument('--dataset_root', type=str, default='./data/mvtec_anomaly_detection', help="dataset root")
     parser.add_argument('--experiment_dir', type=str, default='./experiment/experiment_mlr', help="experiment directory")
-    parser.add_argument('--classname', type=str, default='bottle', help="dataset class")  # 若设为 'all' 则遍历所有子类
+    parser.add_argument('--classname', type=str, default='toothbrush', help="dataset class")  # 若设为 'all' 则遍历所有子类
     parser.add_argument('--img_size', type=int, default=448, help="image size")
     parser.add_argument("--nAnomaly", type=int, default=10, help="the number of anomaly data in training set")
     parser.add_argument("--n_scales", type=int, default=2, help="number of scales at which features are extracted")
