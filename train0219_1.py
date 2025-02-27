@@ -355,12 +355,8 @@ def main():
     parser.add_argument("--total_heads", type=int, default=4, help="number of heads in training")
     parser.add_argument("--nRef", type=int, default=5, help="number of reference images")
     parser.add_argument('--outlier_root', type=str, default=None, help="OOD dataset root")
-    parser.add_argument("--repeats", type=int, default=1, help="number of repeated experiments")
+    parser.add_argument("--repeats", type=int, default=3, help="number of repeated experiments")
 
-    # parser.add_argument("--num_clusters", type=int, default=5, help="K-Means 聚类的类别数")
-    # parser.add_argument("--topk", type=int, default=3, help="KNN 选择的最近邻数")
-    # parser.add_argument("--distance_metric", type=str, default="euclidean",
-    #                     choices=["euclidean", "cosine"], help="计算样本相似度的方法")
 
     args = parser.parse_args()
     args.cuda = not args.no_cuda and torch.cuda.is_available()

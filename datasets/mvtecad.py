@@ -175,10 +175,11 @@ class MVTecAD(BaseADDataset):
                 aspect_ratio=0.3,
                 transform=PatchColorJitter(
                     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+                    # brightness=0.1, contrast=0.1, saturation=0.1, hue=0.03
                 )
             ),
             RandomNoise(prob=0.5, mean=0.0, std=0.05),
-            CutMix(),
+            # CutMix(),
 
 
 
