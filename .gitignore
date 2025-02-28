@@ -1,2 +1,4 @@
 /experiment/
 idea/
+.idea/
+*.iml
